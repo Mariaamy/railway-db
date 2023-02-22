@@ -3,41 +3,39 @@ from flask import Flask, request
 import os
 import pymongo
 
-host = os.environ.get('MONGOHOST')
-pw = os.environ.get('MONGOPASSWORD')
-port = int(os.environ.get('MONGOPORT'))
-user = os.environ.get('MONGOUSER')
-MONGO_URI = os.environ.get('MONGO_URL')
-
-if os.path.exists('.env'):
-    config = dotenv_values('.env')
-    MONGO_URI = config['URI']
-
-else:
-    MONGO_URI = os.environ.get('URI')
-
 
 app = Flask(__name__)
 
-# MongoDB conn
-config = dotenv_values('.env')
-MONGO_URI = config['URI']
-client = pymongo.MongoClient(MONGO_URI)
+
+#### Set up MongoDB connection
+
+# Hardcoded
+# MONGO_URI = 'mongodb://mongo:iVTOhJBmyhvwi4yywWVq@containers-us-west-88.railway.app:6549'
+
+if os.path.exists('.env'):
+    # Read from the .env file
+    config = dotenv_values('.env')
+    MONGO_URI = config['URI']
+    client = pymongo.MongoClient(MONGO_URI)
+
+else:
+    # Use environmental variables
+    MONGO_URI = os.environ.get('MONGO_URL')
+    host = os.environ.get('MONGOHOST')
+    pw = os.environ.get('MONGOPASSWORD')
+    port = os.environ.get('MONGOPORT')
+    # port = int(port)
+    print(type(port), port)
+    user = os.environ.get('MONGOUSER')
+    # url = os.environ.get('MONGO_URL')
+    client = pymongo.MongoClient(host, port,
+                                 password=pw, username=user)
+
 database = client['test']
 
-# database.db.drop_collection('contacts')
-# database.db.create_collection('contacts')
-contacts = [
-    {'_id': '1', 'name': 'Alice'},
-    {'_id': '2', 'name': 'Bob'},
-    {'_id': '3', 'name': 'Eve'}
-]
-
-for contact in contacts:
-    print('Adding contact', contact)
-    database.db['contacts'].insert_one(contact)
 
 
+# Mock database
 CONTACTS = [{"name": "Paul"}, {"name": "Mary"}, {"name": "John"}]
 
 
@@ -56,23 +54,35 @@ def get_contacts():
 
 @app.route('/contacts/<id>')
 def get_contact(id):
-    return CONTACTS[int(id)]
+    result = database['contacts'].find_one({"_id": id})
+    print(result)
+    return result
+
 
 
 @app.route('/contacts', methods=['POST'])
 def update_contact():
+    id = database.inc_id()
+    new_document = request.json
+    new_document['_id'] = id
+    database['contacts'].insert_one(new_document)
+
     name = request.json['name']
     contact = {"name": name}
     CONTACTS.append(contact)
 
-    id = len(CONTACTS) - 1
     return {'id': id}
 
 
 @app.route('/contacts/<id>', methods=['DELETE'])
 def delete_contact(id):
-    del CONTACTS[int(id)]
-    return  {'id': id}
+    result = database['contacts'].delete_one({"_id": id})
+    deletion_successful = result.deleted_count == 1
+
+    if deletion_successful:
+        return {'deletion': deletion_successful, 'id': id}
+    return {'deletion': deletion_successful}
+
 
 
 if __name__ == '__main__':
