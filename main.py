@@ -61,17 +61,10 @@ def get_contact(id):
 
 
 @app.route('/contacts', methods=['POST'])
-def update_contact():
-    id = database.inc_id()
+def add_contact():
     new_document = request.json
-    new_document['_id'] = id
-    database['contacts'].insert_one(new_document)
-
-    name = request.json['name']
-    contact = {"name": name}
-    CONTACTS.append(contact)
-
-    return {'id': id}
+    _name = new_document['name']
+    database['contacts'].insert_one({'name':_name})
 
 
 @app.route('/contacts/<id>', methods=['DELETE'])
